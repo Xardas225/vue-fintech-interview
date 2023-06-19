@@ -1,15 +1,19 @@
 <script>
-import { ref, reactive, onMounted, computed } from "vue";
-import VueDatePicker from "@vuepic/vue-datepicker";
 import axios from "axios";
+import VueDatePicker from "@vuepic/vue-datepicker";
+import { ref, reactive, onMounted, computed } from "vue";
+import { usersStore } from "@/store";
 import { useVuelidate } from "@vuelidate/core";
-import { required, minLength } from "@vuelidate/validators";
+import { required, minLength, alpha } from "@vuelidate/validators";
 import { useRouter } from "vue-router";
+import { getFormatDate } from "@/plugins/getFormatDate";
 import "@vuepic/vue-datepicker/dist/main.css";
 
 export default {
   components: { VueDatePicker },
   setup() {
+    const store = usersStore();
+
     const specElems = ref([]);
     onMounted(async () => {
       const { data } = await axios.post(
@@ -22,37 +26,34 @@ export default {
     });
 
     const formData = reactive({
-      name: "",
-      birthday: new Date(),
-      specialization: "",
+      fio: "",
+      birthday: "",
+      spec: "",
     });
 
     const rules = computed(() => ({
-      name: { required, minLength: minLength(2) },
+      fio: { required, minLength: minLength(2), alpha },
       birthday: { required },
-      specialization: { required },
+      spec: { required },
     }));
 
     const v$ = useVuelidate(rules, formData);
 
-    const format = (date) => {
-      const day = date.getDate();
-      const month = date.getMonth() + 1;
-      const year = date.getFullYear();
-
-      return `${day}.${month}.${year}`;
-    };
-
     const router = useRouter();
 
-    const submitHandler = async () => { 
+    const submitHandler = async () => {
       if (v$.value.$invalid) {
         v$.value.$touch();
-        console.log("invalid");
         return;
       }
 
       try {
+        store.addUser({
+          fio: formData.fio,
+          spec: formData.spec,
+          birthday: getFormatDate(formData.birthday),
+          importance: Math.floor(Math.random() * (3 - 1 + 1)) + 1,
+        });
         router.push("/users");
       } catch (e) {
         console.log(e);
@@ -61,10 +62,10 @@ export default {
 
     return {
       formData,
-      format,
       specElems,
       v$,
       submitHandler,
+      getFormatDate,
     };
   },
 };
@@ -79,15 +80,15 @@ export default {
           <div class="mb-3">
             <label for="name" class="form-label">ФИО</label>
             <input
-              v-model="formData.name"
+              v-model="formData.fio"
               type="text"
               class="form-control"
-              id="name"
+              id="fio"
               placeholder="Введите ФИО"
             />
             <small
               class="helper-text invalid"
-              v-if="v$.name.$dirty && v$.name.$invalid"
+              v-if="v$.fio.$dirty && v$.fio.$invalid"
             >
               Введите ФИО
             </small>
@@ -96,7 +97,7 @@ export default {
             <label for="birthday" class="form-label">Дата рождения</label>
             <VueDatePicker
               v-model="formData.birthday"
-              :format="format"
+              :format="getFormatDate"
               type="text"
               id="birthday"
             />
@@ -108,19 +109,15 @@ export default {
             </small>
           </div>
           <div class="mb-3">
-            <label for="specialization" class="form-label">Специализация</label>
-            <select
-              v-model="formData.specialization"
-              name="specialization"
-              class="form-select"
-            >
+            <label for="spec" class="form-label">Специализация</label>
+            <select v-model="formData.spec" name="spec" class="form-select">
               <template v-for="elem in specElems" :key="elem.code">
                 <option :value="elem.code">{{ elem.value }}</option>
               </template>
             </select>
             <small
               class="helper-text invalid"
-              v-if="v$.specialization.$dirty && v$.specialization.$invalid"
+              v-if="v$.spec.$dirty && v$.spec.$invalid"
             >
               Выберите специализацию
             </small>
